@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MoonDesk · 月面照片检查</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='moon.css') }}">
+<script defer src="{{ url_for('static', filename='moon.js') }}"></script>
+</head>
+<body>
+<header class="masthead">
+  <a class="brand" href="/"><span class="lunar-icon" aria-hidden="true"></span>MoonDesk</a>
+  <p id="status" role="status">可先载入一份合成观测。</p>
+  <div class="header-actions">
+    <a id="prepare" href="/prepare">照片准备 ↗</a>
+    <button id="demo">载入合成练习</button>
+    <button id="open-import" class="primary">导入观测</button>
+  </div>
+</header>
+<main>
+  <div class="headline">
+    <h1 id="title">月面照片检查</h1>
+    <p id="metadata">月盘取样、亮度和检查存档</p>
+  </div>
+  <nav id="library" class="library" aria-label="观测列表"></nav>
+  <div id="desk" class="desk" hidden>
+    <section class="plate" aria-label="照片检查">
+      <div class="toolbar">
+        <div class="switches" aria-label="源照片"><button data-light="a">主照片</button><button data-light="b">对照照片</button></div>
+        <div class="switches" aria-label="显示模式"><button data-view="marked">标记</button><button data-view="photo">照片</button></div>
+        <a id="source" download>下载照片</a>
+      </div>
+      <div class="stage"><canvas id="map" aria-label="源照片像素坐标"></canvas></div>
+      <div class="map-footer">
+        <div class="toolset" aria-label="图上工具">
+          <button data-tool="point">单点</button><button data-tool="disk">画月盘</button><button data-tool="inspect">画检查窗</button>
+          <button data-tool="bright">圈亮区</button><button data-tool="dark">圈暗区</button><button data-tool="line">画剖线</button>
+        </div>
+        <p id="map-note" aria-live="polite">点击照片读取源像素。</p>
+      </div>
+    </section>
+    <aside>
+      <section class="settings">
+        <h2>检查设置</h2>
+        <label>亮度门槛 <input id="threshold" type="number" min="0" max="255" step="0.1"></label>
+        <label>角秒每像素 <input id="arcsec_per_pixel" type="number" min="0.001" max="1200" step="0.001"></label>
+        <label>观测亮侧 <select id="sun_side"><option value="left">左侧</option><option value="right">右侧</option></select></label>
+        <button id="retain-settings">保留设置</button>
+      </section>
+      <section class="archive">
+        <h2>检查存档</h2>
+        <div id="archive"></div>
+      </section>
+    </aside>
+  </div>
+  <section id="result" class="results" hidden>
+    <nav id="modes" aria-label="检查项目"></nav>
+    <div class="result-head">
+      <div><h2 id="result-heading">受光统计</h2><p id="result-note"></p></div>
+      <button id="save" class="primary">保存检查</button>
+      <button id="return-current" hidden>返回当前检查</button>
+    </div>
+    <div id="exports" hidden><a id="csv" download>下载 CSV</a><a id="overlay" download>下载标记图</a></div>
+    <div class="table-wrap"><table><thead id="columns"></thead><tbody id="rows"></tbody></table><p id="empty-rows" hidden>检查窗内没有符合设置的记录。</p></div>
+  </section>
+  <section id="empty" class="empty"><span class="lunar-icon" aria-hidden="true"></span><h2>导入第一张月面照片</h2><p>使用 PNG 或 JPEG。可附上一张已对齐、同尺寸的对照照片。</p></section>
+</main>
+<dialog id="import-dialog">
+  <form id="import-form">
+    <h2>导入观测</h2>
+    <label>观测名称 <input name="title" maxlength="160"></label>
+    <label>主照片 <input name="a" type="file" accept="image/png,image/jpeg" required></label>
+    <label>对照照片（可选） <input name="b" type="file" accept="image/png,image/jpeg"></label>
+    <p id="import-error" aria-live="polite"></p>
+    <div class="header-actions"><button id="close-import" type="button">取消</button><button class="primary">导入</button></div>
+  </form>
+</dialog>
+</body>
+</html>
