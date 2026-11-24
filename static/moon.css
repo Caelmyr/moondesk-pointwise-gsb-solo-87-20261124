@@ -79,6 +79,12 @@ tr[data-sample]:hover { background: #2a3038; }
 dialog { border: 1px solid var(--rule); border-radius: 7px; color: var(--text); background: var(--panel); width: min(440px, 95vw); padding: 22px; }
 dialog::backdrop { background: #000a; }
 dialog .header-actions { justify-content: flex-end; margin-top: 12px; }
+#limb-dialog { width: min(600px, 95vw); }
+#limb-detail { margin-top: 12px; }
+#limb-detail table { margin-top: 10px; }
+#limb-detail th, #limb-detail td { padding: 6px 9px; white-space: normal; }
+.limb-note { margin-top: 10px; }
+#limb-error { color: #ff9b9c; margin-top: 10px; }
 #import-error { margin-top: 10px; }
 @media (max-width: 790px) {
   .masthead { flex-wrap: wrap; gap: 8px 15px; }

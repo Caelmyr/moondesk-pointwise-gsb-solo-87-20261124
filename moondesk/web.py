@@ -7,7 +7,7 @@ from flask import Blueprint, Response, jsonify, render_template, request, send_f
 
 from image_lab.validation import Invalid
 
-from . import analysis, demo, frame, model, output
+from . import analysis, demo, frame, limb, model, output
 from .store import Library
 
 
@@ -96,6 +96,13 @@ def install(app, root):
         panel = library.panel(panel_id)
         settings = model.settings(chosen.get("settings"), panel)
         return jsonify(library.revise(panel_id, chosen.get("revision"), settings))
+
+    @proof.post("/panels/<panel_id>/limb")
+    def limb_proposal(panel_id):
+        chosen = payload()
+        panel = library.panel(panel_id)
+        settings = model.settings(chosen.get("settings"), panel)
+        return jsonify(limb.propose(library, panel, settings))
 
     @proof.post("/panels/<panel_id>/preview")
     def preview(panel_id):

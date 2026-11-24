@@ -1,5 +1,7 @@
 """Measure disk-local intensity and inspect its photo coordinates."""
 
+import math
+
 import numpy as np
 
 from . import frame, model
@@ -82,6 +84,40 @@ def profile(luma, disk, bright, settings):
     } for x, y, distance in zip(xs, ys, distances)]
 
 
+def chord(settings):
+    x0, y0, x1, y1 = settings["line"]
+    dx, dy = x1 - x0, y1 - y0
+    length = math.hypot(dx, dy)
+    empty = {"entry": None, "exit": None, "span_arcsec": None}
+    if not length:
+        return empty
+    bx0, by0, bx1, by1 = settings["disk"]
+    cx, cy = (bx0 + bx1) / 2, (by0 + by1) / 2
+    rx, ry = (bx1 - bx0) / 2, (by1 - by0) / 2
+    ux, uy = dx / rx, dy / ry
+    vx, vy = (x0 - cx) / rx, (y0 - cy) / ry
+    a = ux * ux + uy * uy
+    b = 2 * (ux * vx + uy * vy)
+    c = vx * vx + vy * vy - 1
+    disc = b * b - 4 * a * c
+    if disc <= 0:
+        return empty
+    root = math.sqrt(disc)
+    t1, t2 = (-b - root) / (2 * a), (-b + root) / (2 * a)
+    lo, hi = max(t1, 0.0), min(t2, 1.0)
+    if lo >= hi:
+        return empty
+
+    def crossing(t):
+        return [round(x0 + t * dx, 2), round(y0 + t * dy, 2)]
+
+    return {
+        "entry": crossing(t1) if 0.0 <= t1 <= 1.0 else None,
+        "exit": crossing(t2) if 0.0 <= t2 <= 1.0 else None,
+        "span_arcsec": round((hi - lo) * length * settings["arcsec_per_pixel"], 3),
+    }
+
+
 def reference(luma, settings, key):
     values = section(luma, settings[key])
     quantiles = np.percentile(values, [10, 50, 90])
@@ -138,4 +174,7 @@ def report(library, record, settings, mode):
         rows = histogram(luma, disk, settings)
     else:
         rows = clipping(rgb, disk, settings)
-    return {"mode": mode, "heading": model.MODES[mode], "settings": settings, "rows": rows}
+    result = {"mode": mode, "heading": model.MODES[mode], "settings": settings, "rows": rows}
+    if mode == "profile":
+        result["summary"] = chord(settings)
+    return result

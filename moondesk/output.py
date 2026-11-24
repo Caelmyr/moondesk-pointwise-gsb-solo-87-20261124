@@ -44,6 +44,14 @@ def overlay(library, record, report):
         shape((x0, y0, x1 - 1, y1 - 1), outline=color, width=1)
     if mode == "profile":
         draw.line(chosen["line"], fill="#96d2ce", width=2)
+        summary = report.get("summary") or {}
+        for key, color in (("entry", "#9fe8a9"), ("exit", "#f8bc81")):
+            point = summary.get(key)
+            if point:
+                x, y = point
+                draw.ellipse((x - 4, y - 4, x + 4, y + 4), outline=color, width=2)
+                draw.line((x - 8, y, x + 8, y), fill=color, width=1)
+                draw.line((x, y - 8, x, y + 8), fill=color, width=1)
     if mode == "reference":
         for key in ("bright", "dark"):
             draw.rectangle(chosen[key], outline="#e8be82", width=2)

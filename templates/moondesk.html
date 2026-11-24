@@ -28,6 +28,7 @@
       <div class="toolbar">
         <div class="switches" aria-label="源照片"><button data-light="a">主照片</button><button data-light="b">对照照片</button></div>
         <div class="switches" aria-label="显示模式"><button data-view="marked">标记</button><button data-view="photo">照片</button></div>
+        <button id="fit-limb" type="button">拟合月缘</button>
         <a id="source" download>下载照片</a>
       </div>
       <div class="stage"><canvas id="map" aria-label="源照片像素坐标"></canvas></div>
@@ -65,6 +66,15 @@
   </section>
   <section id="empty" class="empty"><span class="lunar-icon" aria-hidden="true"></span><h2>导入第一张月面照片</h2><p>使用 PNG 或 JPEG。可附上一张已对齐、同尺寸的对照照片。</p></section>
 </main>
+<dialog id="limb-dialog">
+  <h2>圆形月缘建议</h2>
+  <div id="limb-detail"></div>
+  <p id="limb-error" aria-live="polite"></p>
+  <div class="header-actions">
+    <button id="close-limb" type="button">取消</button>
+    <button id="adopt-limb" class="primary">采用该月缘</button>
+  </div>
+</dialog>
 <dialog id="import-dialog">
   <form id="import-form">
     <h2>导入观测</h2>

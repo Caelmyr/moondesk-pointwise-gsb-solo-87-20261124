@@ -5,7 +5,7 @@ const map = byId('map');
 const ctx = map.getContext('2d');
 const current = {
   panel: null, settings: null, config: null, mode: 'illumination', view: 'marked',
-  tool: 'point', first: null, pin: null, saved: null, image: null,
+  tool: 'point', first: null, pin: null, saved: null, image: null, proposal: null,
   drawing: 0, computing: 0, reading: 0, opening: 0,
 };
 const columns = {
@@ -99,6 +99,21 @@ function drawMap() {
     ctx.strokeRect(x0 + 1, y0 + 1, x1 - x0 - 2, y1 - y0 - 2);
   }
   ctx.setLineDash([]);
+  const proposal = current.proposal;
+  if (proposal) {
+    const {cx, cy, radius} = proposal.circle;
+    ctx.setLineDash([8, 5]);
+    ctx.strokeStyle = '#f7cea0';
+    ctx.lineWidth = Math.max(1.5, map.width / 500);
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    for (const [x, y, side] of proposal.samples) {
+      ctx.fillStyle = side === 'bright' ? '#f8c471' : '#7fb5f8';
+      ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
+    }
+  }
   const point = current.first || current.pin;
   if (!point) return;
   const [x, y] = point;
@@ -184,6 +199,7 @@ function renderHeader() {
     selected(button, button.dataset.tool === current.tool);
     button.disabled = Boolean(current.saved) && button.dataset.tool !== 'point';
   }
+  byId('fit-limb').disabled = Boolean(current.saved) || !sources.b;
   for (const key of inputKeys) {
     byId(key).value = settings[key];
     byId(key).disabled = Boolean(current.saved);
@@ -215,6 +231,17 @@ function renderResult(report) {
   const [x0, y0, x1, y1] = report.settings.inspect;
   const note = [current.config.lights[report.settings.light], '窗 ' + (x1 - x0) + ' × ' + (y1 - y0) + ' px'];
   if (current.saved) note.push('已存档');
+  if (report.mode === 'profile' && report.summary) {
+    const summary = report.summary;
+    if (summary.span_arcsec === null) {
+      note.push('剖线未穿过月盘');
+    } else {
+      let span = '盘内 ' + summary.span_arcsec + ' 角秒';
+      if (summary.entry) span += ' · 进盘 (' + summary.entry.join(', ') + ')';
+      if (summary.exit) span += ' · 出盘 (' + summary.exit.join(', ') + ')';
+      note.push(span);
+    }
+  }
   byId('result-note').textContent = note.join(' · ');
   const keys = Object.keys(report.rows[0] || {}).filter(key => key !== 'box');
   const header = document.createElement('tr');
@@ -283,6 +310,7 @@ async function activate(panel) {
   current.pin = null;
   current.saved = null;
   current.image = null;
+  current.proposal = null;
   current.tool = 'point';
   map.width = panel.width;
   map.height = panel.height;
@@ -422,6 +450,92 @@ byId('return-current').onclick = safe(async () => {
   await refresh();
   status('已返回当前检查。');
 });
+
+const limbDialog = byId('limb-dialog');
+
+function limbArcs(arcs) {
+  return arcs.length ? arcs.map(pair => pair[0] + '° ~ ' + pair[1] + '°').join('，') : '—';
+}
+
+function renderLimbDialog(proposal) {
+  const detail = byId('limb-detail');
+  detail.replaceChildren();
+  const circle = proposal.circle;
+  const lead = document.createElement('p');
+  lead.textContent = '建议圆：圆心 (' + circle.cx + ', ' + circle.cy + ') · 半径 ' + circle.radius +
+    ' px · 整体偏差 RMS ' + proposal.rms_px + ' px';
+  const table = document.createElement('table');
+  const head = document.createElement('tr');
+  for (const label of ['月缘', '取自', '用到的弧段', '点数', '偏差 RMS', '最大偏差']) {
+    const cell = document.createElement('th');
+    cell.textContent = label;
+    head.append(cell);
+  }
+  table.append(head);
+  for (const [side, label] of [['bright', '亮侧（短曝）'], ['dark', '暗侧（长曝）']]) {
+    const report = proposal.sides[side];
+    const row = document.createElement('tr');
+    const values = [label, current.config.lights[report.light], limbArcs(report.arcs), report.count,
+      report.rms_px === null ? '—' : report.rms_px + ' px', report.max_px === null ? '—' : report.max_px + ' px'];
+    for (const value of values) {
+      const cell = document.createElement('td');
+      cell.textContent = value;
+      row.append(cell);
+    }
+    table.append(row);
+  }
+  const comparison = document.createElement('p');
+  comparison.className = 'limb-note';
+  comparison.textContent = proposal.conflict
+    ? '亮暗两侧各自拟合的出入：圆心相差 ' + proposal.conflict.center_shift_px +
+      ' px，半径相差 ' + proposal.conflict.radius_gap_px + ' px；建议圆取两侧折中。'
+    : '某一侧可用月缘不足，建议圆主要由单侧边缘决定。';
+  const convention = document.createElement('p');
+  convention.className = 'limb-note';
+  convention.textContent = '弧段角度自画面右侧起顺时针计（图像坐标）；图上橙点为亮侧取样、蓝点为暗侧取样，虚线为建议圆。';
+  detail.append(lead, table, comparison, convention);
+  for (const text of proposal.notes) {
+    const extra = document.createElement('p');
+    extra.className = 'limb-note';
+    extra.textContent = text;
+    detail.append(extra);
+  }
+}
+
+byId('fit-limb').onclick = safe(async () => {
+  const proposal = await json(endpoint('/limb'), 'POST', {settings: current.settings});
+  current.proposal = proposal;
+  renderLimbDialog(proposal);
+  byId('limb-error').textContent = '';
+  drawMap();
+  limbDialog.showModal();
+});
+
+byId('close-limb').onclick = () => limbDialog.close();
+
+limbDialog.addEventListener('close', () => {
+  current.proposal = null;
+  drawMap();
+});
+
+byId('adopt-limb').onclick = async () => {
+  if (!current.proposal) return;
+  const settings = {...current.settings, disk: current.proposal.disk};
+  let panel;
+  try {
+    panel = await json(endpoint('/settings'), 'PUT', {settings, revision: current.panel.revision});
+  } catch (error) {
+    byId('limb-error').textContent = error.message;
+    return;
+  }
+  if (current.panel.id !== panel.id) return;
+  current.panel = panel;
+  current.settings = structuredClone(panel.settings);
+  current.proposal = null;
+  limbDialog.close();
+  await refresh();
+  status('已采用圆形月缘。可切换到亮度剖线查看进盘和出盘。');
+};
 
 const dialog = byId('import-dialog');
 byId('open-import').onclick = () => { byId('import-error').textContent = ''; dialog.showModal(); };
