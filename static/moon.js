@@ -9,19 +9,30 @@ const current = {
   drawing: 0, computing: 0, reading: 0, opening: 0,
 };
 const columns = {
-  disk_px: '月盘像素', light_px: '亮区像素', shadow_px: '暗区像素', light_pct: '亮区 %',
-  light_arcsec2: '亮区角秒²', y: '源 Y', x: '源 X', jump: '亮度落差', candidates: '候选数',
+  disk_px: '月盘像素', light_px: '亮区像素', dark_px: '暗区像素', pending_px: '待确认像素',
+  light_pct: '亮区 %',
+  light_arcsec2: '亮区角秒²', dark_arcsec2: '暗区角秒²', pending_arcsec2: '待确认角秒²',
+  boundary_rows: '有界点行', blank_rows: '留空行',
+  y: '源 Y', x: '采用 X', jump: '采用落差', candidates: '候选数',
+  alternative_x: '另一候选 X', alternative_jump: '另一候选落差', status: '采用情况', segment: '界段',
+  note: '判断依据',
   distance_arcsec: '距离（角秒）', luma: '亮度', in_disk: '月盘', bright: '亮度归类',
   reference: '参照', pixels: '像素数', p10: '第 10 百分位', median: '中位数', p90: '第 90 百分位',
   lower: '下界', upper: '上界', sky_px: '背景像素',
   channel: '颜色通道', samples: '像素数', floor_px: '接近黑位', ceiling_px: '接近白位',
+};
+const orders = {
+  illumination: ['disk_px', 'light_px', 'light_pct', 'light_arcsec2', 'dark_px', 'dark_arcsec2',
+    'pending_px', 'pending_arcsec2', 'boundary_rows', 'blank_rows'],
+  crossings: ['y', 'status', 'x', 'jump', 'segment', 'alternative_x', 'alternative_jump',
+    'candidates', 'note'],
 };
 const directions = {
   point: '点击照片读取源像素。', inspect: '依次点选检查窗的两个角。',
   disk: '点选月盘外接框的两个角。', bright: '框选一块受光区作为参照。',
   dark: '框选一块暗面作为参照。', line: '依次点选亮度剖线的两端。',
 };
-const inputKeys = ['threshold', 'arcsec_per_pixel', 'sun_side'];
+const inputKeys = ['threshold', 'arcsec_per_pixel', 'sun_side', 'boundary'];
 
 function status(message, error = false) {
   const element = byId('status');
@@ -185,7 +196,8 @@ function renderHeader() {
     button.disabled = Boolean(current.saved) && button.dataset.tool !== 'point';
   }
   for (const key of inputKeys) {
-    byId(key).value = settings[key];
+    const value = settings[key] ?? (key === 'boundary' ? 'trace' : '');
+    byId(key).value = value;
     byId(key).disabled = Boolean(current.saved);
   }
   for (const button of document.querySelectorAll('[data-mode]')) {
@@ -204,7 +216,7 @@ function renderHeader() {
 }
 
 function display(value, key) {
-  if (value === null) return '—';
+  if (value === null || value === undefined) return '—';
   if (key === 'in_disk') return value ? '盘内' : '盘外';
   if (key === 'bright') return value ? '高于门槛' : '低于门槛';
   return String(value);
@@ -214,9 +226,16 @@ function renderResult(report) {
   byId('result-heading').textContent = report.heading;
   const [x0, y0, x1, y1] = report.settings.inspect;
   const note = [current.config.lights[report.settings.light], '窗 ' + (x1 - x0) + ' × ' + (y1 - y0) + ' px'];
+  if (report.mode === 'illumination') {
+    note.push(report.settings.boundary === 'threshold' ? '按亮度门槛' : '按明暗界');
+  }
   if (current.saved) note.push('已存档');
   byId('result-note').textContent = note.join(' · ');
-  const keys = Object.keys(report.rows[0] || {}).filter(key => key !== 'box');
+  byId('result-summary').textContent = report.note || '';
+  const available = Object.keys(report.rows[0] || {}).filter(key => key !== 'box');
+  const preferred = orders[report.mode] || [];
+  const keys = preferred.filter(key => available.includes(key))
+    .concat(available.filter(key => !preferred.includes(key)));
   const header = document.createElement('tr');
   for (const key of keys) {
     const cell = document.createElement('th');
@@ -233,12 +252,14 @@ function renderResult(report) {
       cell.textContent = display(row[key], key);
       entry.append(cell);
     }
-    if (row.x !== undefined && row.y !== undefined) {
+    if (row.status) entry.dataset.status = row.status;
+    const sampleX = row.x ?? row.alternative_x;
+    if (sampleX !== undefined && sampleX !== null && row.y !== undefined) {
       entry.dataset.sample = 'yes';
       entry.tabIndex = 0;
-      entry.onclick = safe(() => inspectPoint(Math.floor(row.x), row.y));
+      entry.onclick = safe(() => inspectPoint(Math.floor(sampleX), row.y));
       entry.onkeydown = safe(event => {
-        if (event.key === 'Enter') return inspectPoint(Math.floor(row.x), row.y);
+        if (event.key === 'Enter') return inspectPoint(Math.floor(sampleX), row.y);
       });
     }
     body.append(entry);
@@ -386,7 +407,7 @@ for (const key of inputKeys) {
   byId(key).onchange = safe(async () => {
     const field = byId(key);
     if (!field.value || !field.checkValidity()) throw Error('请检查设置的数值范围。');
-    current.settings[key] = key === 'sun_side' ? field.value : Number(field.value);
+    current.settings[key] = key === 'sun_side' || key === 'boundary' ? field.value : Number(field.value);
     current.reading++;
     announceMap(directions[current.tool]);
     await refresh();

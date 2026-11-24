@@ -15,6 +15,10 @@ MODES = {
     "histogram": "亮度分布",
     "clipping": "剪切检查",
 }
+BOUNDARIES = {
+    "trace": "按明暗界",
+    "threshold": "按亮度门槛",
+}
 TOOLS = {
     "inspect": "检查窗",
     "disk": "月盘范围",
@@ -58,7 +62,7 @@ def positions(value, size, rectangle):
 
 def defaults(width, height):
     return {
-        "light": "a", "threshold": 75, "arcsec_per_pixel": 2, "sun_side": "left",
+        "light": "a", "threshold": 75, "arcsec_per_pixel": 2, "sun_side": "left", "boundary": "trace",
         "inspect": [0, 0, width, height],
         "disk": [width // 8, height // 8, width - width // 8, height - height // 8],
         "bright": [width // 4, height // 3, width // 2, height * 2 // 3],
@@ -78,8 +82,11 @@ def settings(value, panel):
     sun = value.get("sun_side", base["sun_side"])
     if sun not in ("left", "right"):
         raise Invalid("请选择月面亮侧的大致方向。")
+    boundary = value.get("boundary", base.get("boundary", "trace"))
+    if boundary not in BOUNDARIES:
+        raise Invalid("请选择受光统计使用的明暗界。")
     chosen.update(
-        light=light, sun_side=sun,
+        light=light, sun_side=sun, boundary=boundary,
         threshold=number(value.get("threshold", base["threshold"]), "亮度门槛", 0, 255),
         arcsec_per_pixel=number(value.get("arcsec_per_pixel", base["arcsec_per_pixel"]), "角秒每像素", 0.001, 1200),
     )

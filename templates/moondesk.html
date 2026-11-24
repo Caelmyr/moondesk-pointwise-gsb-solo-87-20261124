@@ -45,6 +45,7 @@
         <label>亮度门槛 <input id="threshold" type="number" min="0" max="255" step="0.1"></label>
         <label>角秒每像素 <input id="arcsec_per_pixel" type="number" min="0.001" max="1200" step="0.001"></label>
         <label>观测亮侧 <select id="sun_side"><option value="left">左侧</option><option value="right">右侧</option></select></label>
+        <label>受光统计依据 <select id="boundary"><option value="trace">按明暗界</option><option value="threshold">按亮度门槛</option></select></label>
         <button id="retain-settings">保留设置</button>
       </section>
       <section class="archive">
@@ -56,7 +57,7 @@
   <section id="result" class="results" hidden>
     <nav id="modes" aria-label="检查项目"></nav>
     <div class="result-head">
-      <div><h2 id="result-heading">受光统计</h2><p id="result-note"></p></div>
+      <div><h2 id="result-heading">受光统计</h2><p id="result-note"></p><p id="result-summary"></p></div>
       <button id="save" class="primary">保存检查</button>
       <button id="return-current" hidden>返回当前检查</button>
     </div>

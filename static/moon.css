@@ -65,6 +65,9 @@ aside section { padding: 14px; }
 #modes { display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid var(--rule); padding: 10px 13px; }
 .result-head { padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 #result-note { margin-top: 5px; }
+#result-summary { margin-top: 5px; max-width: 88ch; line-height: 1.45; color: var(--text); }
+#result-summary:empty { display: none; }
+.results tbody tr[data-status="留空"] td { color: var(--muted); }
 #exports { display: flex; gap: 17px; padding: 0 14px 12px; }
 .table-wrap { max-height: 235px; overflow: auto; }
 table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; font-variant-numeric: tabular-nums; }

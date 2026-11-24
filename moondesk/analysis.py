@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from . import frame, model
+from . import boundary, frame, model
 
 
 def section(array, rect):
@@ -29,44 +29,51 @@ def percentage(part, total):
     return round(100 * part / total, 2) if total else None
 
 
-def illumination(disk, bright, settings):
+def area(count, arcsec):
+    return round(count * arcsec * arcsec, 3)
+
+
+def illumination(disk, luma, bright, settings):
+    if settings.get("boundary", "trace") == "trace":
+        trace = boundary.trace(disk, luma, settings)
+        totals, _ = boundary.counts(disk, settings, trace["points"])
+        arcsec = settings["arcsec_per_pixel"]
+        rows = [{"disk_px": totals["disk"], "light_px": totals["light"],
+                 "dark_px": totals["dark"], "pending_px": totals["pending"],
+                 "light_pct": percentage(totals["light"], totals["disk"]),
+                 "light_arcsec2": area(totals["light"], arcsec),
+                 "dark_arcsec2": area(totals["dark"], arcsec),
+                 "pending_arcsec2": area(totals["pending"], arcsec),
+                 "boundary_rows": totals["boundary_rows"], "blank_rows": totals["blank_rows"]}]
+        note = ("按采用明暗界重算：琥珀=亮区，靛蓝=暗区，洋红=待确认；"
+                "青线=采用的逐行界点，红圈=留空行。" + trace["summary"])
+        return rows, trace, note
+
     mask = section(disk, settings["inspect"])
     light = section(bright, settings["inspect"])
     total = int(mask.sum())
     above = int((mask & light).sum())
     arcsec = settings["arcsec_per_pixel"]
-    return [{
-        "disk_px": total, "light_px": above, "shadow_px": total - above,
+    rows = [{
+        "disk_px": total, "light_px": above, "dark_px": total - above, "pending_px": 0,
         "light_pct": percentage(above, total),
-        "light_arcsec2": round(above * arcsec * arcsec, 3),
+        "light_arcsec2": area(above, arcsec),
+        "dark_arcsec2": area(total - above, arcsec), "pending_arcsec2": 0.0,
+        "boundary_rows": None, "blank_rows": None,
     }]
+    note = "按亮度门槛统计：亮区像素为亮度不低于门槛的盘内像素。"
+    return rows, None, note
 
 
-def crossings(disk, luma, bright, settings):
-    x0, y0, _, _ = settings["inspect"]
-    cut_disk = section(disk, settings["inspect"])
-    cut_luma = section(luma, settings["inspect"])
-    cut_bright = section(bright, settings["inspect"])
-    trend = np.diff(cut_luma, axis=1)
-    left_sun = settings["sun_side"] == "left"
-    if left_sun:
-        crossing = cut_bright[:, :-1] & ~cut_bright[:, 1:]
-        strength = -trend
-    else:
-        crossing = ~cut_bright[:, :-1] & cut_bright[:, 1:]
-        strength = trend
-    valid = crossing & cut_disk[:, :-1] & cut_disk[:, 1:]
+def crossings(disk, luma, settings):
+    trace = boundary.trace(disk, luma, settings)
+    by_row = {int(y): index + 1 for index, segment in enumerate(trace["segments"])
+              for y, _ in segment["points"]}
     rows = []
-    for offset in range(valid.shape[0]):
-        candidates = np.flatnonzero(valid[offset])
-        if not candidates.size:
-            continue
-        index = int(candidates[np.argmax(strength[offset, candidates])])
-        rows.append({
-            "y": y0 + offset, "x": x0 + index + 0.5,
-            "jump": round(float(strength[offset, index]), 2), "candidates": int(candidates.size),
-        })
-    return rows
+    for row in trace["rows"]:
+        rows.append({**row, "segment": by_row.get(int(row["y"]))})
+    note = trace["summary"] + " 青色=采用段（亮青为主段），橙色=未采用的短偏折候选，红圈=留空行。"
+    return rows, trace, note
 
 
 def profile(luma, disk, bright, settings):
@@ -126,10 +133,11 @@ def point_reading(library, record, settings, point):
 
 def report(library, record, settings, mode):
     rgb, disk, luma, bright = layers(library, record, settings)
+    trace = note = None
     if mode == "illumination":
-        rows = illumination(disk, bright, settings)
+        rows, trace, note = illumination(disk, luma, bright, settings)
     elif mode == "crossings":
-        rows = crossings(disk, luma, bright, settings)
+        rows, trace, note = crossings(disk, luma, settings)
     elif mode == "profile":
         rows = profile(luma, disk, bright, settings)
     elif mode == "reference":
@@ -138,4 +146,8 @@ def report(library, record, settings, mode):
         rows = histogram(luma, disk, settings)
     else:
         rows = clipping(rgb, disk, settings)
-    return {"mode": mode, "heading": model.MODES[mode], "settings": settings, "rows": rows}
+    result = {"mode": mode, "heading": model.MODES[mode], "settings": settings, "rows": rows}
+    if trace is not None:
+        result["trace"] = trace
+        result["note"] = note
+    return result
